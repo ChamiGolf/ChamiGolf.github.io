@@ -128,6 +128,11 @@ service cloud.firestore {
       allow create: if isAdmin() || (isMe(uid) && request.resource.data.auto == true);
       allow update, delete: if isAdmin();
     }
+    // Banned golfers' IDs (written by the creator's tools), so every game hides them from all the leaderboards.
+    match /meta/bannedList {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
     // Suspicious things the game noticed, for the creator to review.
     match /flags/{id} {
       allow read, delete: if isAdmin();
