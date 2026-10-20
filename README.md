@@ -10,8 +10,8 @@ Play it at https://chamigolf.github.io/
 - Swipe left or right to aim. MAP shows the whole hole, and you can tap it to aim.
 - Press the ball and pull back. Every shot works like putting: the tag next to the ball shows your swing % (100% = the club's full distance) with a rough distance guide underneath.
 - Let go in the bright gold zone for a perfect strike.
-- Putting: aim exactly with the ◀ AIM ▶ buttons in the bottom-left corner (hold to keep turning) or the left/right arrow keys (Shift = bigger steps; up/down arrows change club). The Green Reader says where to aim (left/right of the cup), how hard (Plays like, in feet), the slope and the green speed, shows the ball's path as a gold line and tells you when your aim is on the line. Putts roll the distance you set, and wind never moves a putt (it barely touches little chips either).
-- Momentum: 3 holes in a row with no bogey adds +3% to hole payouts, then +3% more per hole you keep it going (up to +30%). A bogey ends it.
+- Putting: aim exactly with the ◀ AIM ▶ buttons in the bottom-left corner (hold to keep turning) or the left/right arrow keys (Shift = bigger steps; up/down arrows change club). Wind never moves a putt (it barely touches little chips either).
+- Momentum: 3 holes in a row with no bogey adds +20% to hole payouts, then +20% more per hole you keep it going, with no limit. A bogey ends it.
 - Rough cuts distance 15% and sand cuts it 40% (less with the Sand Wedge). Watch the wind arrow.
 - Water and out of bounds cost a stroke. Cart paths are concrete: the ball kicks up and skips off them.
 - Left-handed? Switch hands in the Golfer tab.
@@ -26,7 +26,7 @@ Play it at https://chamigolf.github.io/
 
 ## Clubs and upgrades
 
-- Each club has three upgrades, up to level 5 each: Power (+4% distance), Accuracy (+1.6% gold zone, and misses and putts 8% straighter) and Control (needle 12% slower). Levels cost $400 / $900 / $1,800 / $3,500 / $6,000 (Power 20% more). A stat can only go one level past the club's lowest stat.
+- Each club has three upgrades, up to level 5 each: Power (+4% distance), Accuracy (+1.6% gold zone, and misses 8% straighter) and Control (needle 12% slower). Levels cost $400 / $900 / $1,800 / $3,500 / $6,000 (Power 20% more). A stat can only go one level past the club's lowest stat.
 - Lots of club models to buy in every slot, and club colours (buy a colour once, paint any club).
 
 ## Online

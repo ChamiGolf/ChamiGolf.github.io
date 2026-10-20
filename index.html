@@ -84,10 +84,7 @@
   #greenCv{height:126px}
   #mapCv{height:196px;border-top:1px solid rgba(255,255,255,.25)}
   #side .rb{font:700 14px/1.1 Oswald,sans-serif;text-align:center;color:var(--gold-l);padding:5px 6px 0;letter-spacing:.02em}
-  #side .rs{font:600 10.5px/1.3 Inter,sans-serif;color:#f3d7a8;text-align:center;padding:1px 6px 2px}
-  #side .rs b{color:#fff}
-  #side .ra{font:800 10.5px/1.3 Inter,sans-serif;color:#ffb3bd;text-align:center;padding:0 6px 6px}
-  #side .ra.ok{color:#9ff0a8}
+  #side .rs{font:600 10.5px/1.3 Inter,sans-serif;color:#f3d7a8;text-align:center;padding:1px 6px 6px}
   #side .mm{position:relative}
   #side .mmchips{position:absolute;left:6px;bottom:6px;display:flex;flex-direction:column;gap:3px}
   #side .mmchips div{display:flex;gap:6px;align-items:baseline;background:rgba(0,0,0,.62);border-radius:6px;padding:2px 7px;font:600 10px Inter,sans-serif;color:#ddd}
@@ -742,7 +739,7 @@
   <div class="sbody">
     <div class="ghd"><span id="gHead">Green</span><span id="gSlope"></span></div>
     <canvas id="greenCv" width="356" height="252"></canvas>
-    <div id="readerBox"><div class="rb" id="readerBreak"></div><div class="rs" id="readerSlope"></div><div class="ra" id="readerAim"></div></div>
+    <div id="readerBox"><div class="rb" id="readerBreak"></div><div class="rs" id="readerSlope"></div></div>
     <div class="mm"><canvas id="mapCv" width="356" height="392"></canvas>
       <div class="mmchips"><div><span>Next</span><b id="mmNext"></b></div><div><span>Dist</span><b id="mmDist"></b></div><div><span>Height</span><b id="mmHt"></b></div></div></div>
   </div>
@@ -3141,11 +3138,11 @@
   let state = 'title', clubIdx = 0, recIdx = 0, aimAng = 0, flight = null, swing = null, ptr = null, strike = null, swingAnim = null;
   let viewMode = 'normal', introT = 0, sinkT = 0, penT = 0, splash = null, doneT = 0, lastPutt = false, lastClub = -1;
   let lastDir = { x: 0, y: -1 }, bannerT = 0, ratingT = 0, firstShot = true, confetti = [], driveYds = null, roundAces = 0, roundStart = 0;
-  // Momentum: string together holes with no bogey (par or better) and your hole payouts grow. 3 holes in a row = +3%,
-  // then +3% more for every hole the streak keeps going (up to +30%). A bogey (or picking up) ends it.
+  // Momentum: string together holes with no bogey (par or better) and your hole payouts grow. 3 holes in a row = +20%,
+  // then +20% more for every hole the streak keeps going, with no limit. A bogey (or picking up) ends it.
   let streak = 0;
-  const MO_START = 3, MO_STEP = 3, MO_MAX = 30;
-  const momentumPct = k => k >= MO_START ? Math.min(MO_MAX, (k - MO_START + 1) * MO_STEP) : 0;
+  const MO_START = 3, MO_STEP = 20;
+  const momentumPct = k => k >= MO_START ? (k - MO_START + 1) * MO_STEP : 0;
   // per-round numbers the anti-cheat looks at
   let rStat = { shots: 0, perf: 0, eagles: 0, chips: 0, perfRun: 0 };
   // Scorecards are packed as one character per hole (1-9, a=10, b=11, c=12) so they fit in a cheat flag or a ban note.
@@ -3466,14 +3463,12 @@
       // A pure stroke rolls almost exactly the shown distance on the aimed line. Off the gold the
       // face is open/closed (push/pull) and the strike is off-centre, so it comes up short too.
       // Pace: the stroke sets the ball's speed for a flat Stimp-10 green, and the longer the putt the more your
-      // feel wobbles a little.
+      // feel wobbles (about ±6% at 5 ft, ±9% at 20 ft, ±13% at 40 ft; a pure strike trims that by a quarter).
       // Line: even a pure strike starts within about a degree, like a tour pro; off the gold it's pushed or pulled.
-      // (Oct 20 2026: putts roll much truer, so the distance you pull back is the distance you get: about ±2.5% at 5 ft,
-      //  ±3.5% at 20 ft and ±5% at 40 ft, less with a pure strike or Accuracy upgrades.)
-      const pl = lie === 'fringe' ? 1.2 : lieErr, want = full * power, ft = Math.min(60, want * 3), mm = missMult(c);
-      const wobble = (0.02 + 0.0008 * ft) * (oe === 0 ? 0.6 : 1 + 0.5 * aoe) * mm;
-      const dist = want * (1 - 0.06 * aoe + gauss() * wobble);
-      const ang = aimAng + (oe * 4 * pl * mm + gauss() * (0.3 + 0.3 * aoe + 0.004 * ft) * mm) * DEG;
+      const pl = lie === 'fringe' ? 1.2 : lieErr, want = full * power, ft = Math.min(60, want * 3);
+      const wobble = (0.045 + 0.0022 * ft) * (oe === 0 ? 0.75 : 1 + 0.6 * aoe);
+      const dist = want * (1 - 0.08 * aoe + gauss() * wobble);
+      const ang = aimAng + (oe * 4.5 * pl + gauss() * (0.85 + 0.4 * aoe + 0.008 * ft)) * DEG;
       const v = strokeSpeed(dist);
       ball.vx = Math.cos(ang) * v; ball.vy = Math.sin(ang) * v; ball.rollT = 0;
       state = 'rolling'; sfx.putt();
@@ -3768,7 +3763,7 @@
         ball.vx -= SLOPE_G * gr.x * h; ball.vy -= SLOPE_G * gr.y * h; pull = SLOPE_G * Math.hypot(gr.x, gr.y);
         // real greens aren't perfect: footprints, grain and tiny bumps nudge a slow ball off line
         if (!hole.mini && t === 'green' && sp > 0.05) {
-          const nz = gauss() * 0.3 * h / Math.max(0.5, sp), nx = -ball.vy, ny = ball.vx;
+          const nz = gauss() * 0.9 * h / Math.max(0.5, sp), nx = -ball.vy, ny = ball.vx;
           ball.vx += nx * nz; ball.vy += ny * nz;
         }
         sp = Math.hypot(ball.vx, ball.vy);
@@ -4203,8 +4198,7 @@
         fctx.font = '700 28px Oswald, sans-serif'; fctx.fillStyle = '#fff';
         fctx.fillText(`${Math.round(swing.power * 100)}%`, left + 10, ty + 14);
         fctx.font = '700 10px Inter, sans-serif'; fctx.fillStyle = '#f3d7a8';
-        const prd = c.putter && puttRead && puttRead.key === puttKey() ? puttRead : null;
-        fctx.fillText(c.putter ? (prd ? `${Math.round(yds * 3)} ft · needs ${Math.round(prd.playsFt)}` : `${Math.round(yds * 3)} ft flat·stimp 10`) : `~${Math.round(yds / 5) * 5} yds calm·flat`, left + 8, ty + 27);
+        fctx.fillText(c.putter ? `~${Math.round(yds * 3)} ft flat·stimp 10` : `~${Math.round(yds / 5) * 5} yds calm·flat`, left + 8, ty + 27);
       }
       fctx.textAlign = 'center';
       const cvd = c.putter ? 0 : curveOf(swing.lat, yds), fadeSide = cvd * hand() > 0;   // fade = curves away from the golfer
@@ -4263,53 +4257,6 @@
     }
     return path;
   }
-  // ---- Putt solver: the line and pace that hole the putt (dying about a foot past), found by rolling the ball on this
-  // green exactly like the game does (slope and green speed; wind never touches a putt). Worked out once per ball spot.
-  let puttRead = null;
-  const flatFt = v => Math.max(0, (v * v - 0.0144) / (2 * DECEL.green)) * 3;   // a stroke's speed → feet on a flat Stimp-10 green
-  function rollPath(ang, v) {
-    const b = { x: ball.x, y: ball.y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v }, path = [{ x: b.x, y: b.y }], dt = 1 / 240;
-    for (let i = 0; i < 6000; i++) {
-      b.x += b.vx * dt; b.y += b.vy * dt;
-      const t = terrainAt(b); if (t === 'water' || t === 'oob') break;
-      let pull = 0;
-      if (slopeLie(hole, t)) { const g = slopeGrad(hole, b.x, b.y); b.vx -= SLOPE_G * g.x * dt; b.vy -= SLOPE_G * g.y * dt; pull = SLOPE_G * Math.hypot(g.x, g.y); }
-      const sp = Math.hypot(b.vx, b.vy), dec = (DECEL[t] || DECEL.green) * dK(t), ns = sp - dec * dt;
-      if (ns < 0.12 && pull < dec * 0.9) break;
-      if (sp > 0) { b.vx *= Math.max(0, ns) / sp; b.vy *= Math.max(0, ns) / sp; }
-      if (i % 3 === 0) path.push({ x: b.x, y: b.y });
-    }
-    path.push({ x: b.x, y: b.y });
-    return path;
-  }
-  const puttKey = () => `${holeIdx},${ball.x.toFixed(3)},${ball.y.toFixed(3)},${hole.slick}`;
-  function readPutt() {
-    const key = puttKey();
-    if (puttRead && puttRead.key === key) return puttRead;
-    const pin = hole.pin, d = Math.max(0.05, distToPin()), a0 = Math.atan2(pin.y - ball.y, pin.x - ball.x);
-    const u = { x: Math.cos(a0), y: Math.sin(a0) }, ur = { x: -u.y, y: u.x }, past = 0.33;
-    let ang = a0, v = puttSpeed(d + past, a0), path = [];
-    for (let it = 0; it < 10; it++) {
-      path = rollPath(ang, v);
-      const end = path[path.length - 1], stop = (end.x - ball.x) * u.x + (end.y - ball.y) * u.y;
-      // where the ball is when it reaches the cup's distance (or where it stopped, if short)
-      let at = end;
-      for (let i = 1; i < path.length; i++) {
-        const a1 = (path[i].x - ball.x) * u.x + (path[i].y - ball.y) * u.y;
-        if (a1 >= d) { const p0 = path[i - 1], a0b = (p0.x - ball.x) * u.x + (p0.y - ball.y) * u.y, k = (d - a0b) / ((a1 - a0b) || 1);
-          at = { x: p0.x + (path[i].x - p0.x) * k, y: p0.y + (path[i].y - p0.y) * k }; break; }
-      }
-      const miss = (at.x - pin.x) * ur.x + (at.y - pin.y) * ur.y;
-      ang -= Math.atan2(miss, d) * 0.9;
-      if (stop > 0.05) v *= clamp(Math.sqrt((d + past) / stop), 0.7, 1.4); else v *= 1.3;
-      if (Math.abs(miss) < 0.004 && Math.abs(stop - d - past) < 0.03) break;
-    }
-    path = rollPath(ang, v);
-    puttRead = { key, ang, v, path, d, aimYd: Math.tan(ang - a0) * d, playsFt: flatFt(v),
-      rise: (terrainH(hole, pin.x, pin.y) - terrainH(hole, ball.x, ball.y)) * 36 };
-    return puttRead;
-  }
-  const inchFt = yd => { const inch = Math.abs(yd) * 36; return inch < 11.5 ? `${Math.max(1, Math.round(inch))} in` : `${(inch / 12).toFixed(1)} ft`; };
   // ---- Side panel: green heat map (blue = low, red = high, arrows run downhill) and an overhead hole map ----
   save.ui = save.ui || {};
   if (save.ui.side == null) save.ui.side = innerWidth >= 700;
@@ -4374,15 +4321,8 @@
     g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(P[0], P[1]); g.lineTo(P[0], P[1] - 26); g.stroke();
     g.fillStyle = '#e3212f'; g.beginPath(); g.moveTo(P[0], P[1] - 26); g.lineTo(P[0] + 15, P[1] - 21); g.lineTo(P[0], P[1] - 16); g.closePath(); g.fill();
     const B = toC(ball), onMap = B[0] > 0 && B[0] < Wc && B[1] > 0 && B[1] < Hc;
-    const pr = !hole.mini && CLUBS[clubIdx].putter && greenLie(terrainAt(ball)) && (state === 'ready' || state === 'swinging' || state === 'striking') ? readPutt() : null;
-    if (pr && pr.path.length > 1) {   // the ball's path for the solved putt (gold) and where you're aimed (white)
-      g.setLineDash([3, 4]); g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 4.5; g.beginPath();
-      pr.path.forEach((q, i) => { const c2 = toC(q); i ? g.lineTo(c2[0], c2[1]) : g.moveTo(c2[0], c2[1]); }); g.stroke();
-      g.strokeStyle = '#FFE08A'; g.lineWidth = 2.5; g.stroke(); g.setLineDash([]);
-    }
     if (onMap) {
-      const aimEnd = toC({ x: ball.x + Math.cos(aimAng) * distToPin(), y: ball.y + Math.sin(aimAng) * distToPin() });
-      g.setLineDash([5, 5]); g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2; g.beginPath(); g.moveTo(B[0], B[1]); g.lineTo(aimEnd[0], aimEnd[1]); g.stroke(); g.setLineDash([]);
+      g.setLineDash([5, 5]); g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2; g.beginPath(); g.moveTo(B[0], B[1]); g.lineTo(P[0], P[1]); g.stroke(); g.setLineDash([]);
       g.fillStyle = '#fff'; g.strokeStyle = '#111'; g.lineWidth = 2; g.beginPath(); g.arc(B[0], B[1], 6, 0, Math.PI * 2); g.fill(); g.stroke();
     }
     // legend: low → high
@@ -4436,26 +4376,21 @@
     const mk = `${gk},${clubIdx},${state},${flight ? Math.round(flight.t * 10) : ''}`;
     if (mk !== mapKey) { mapKey = mk; drawMap(); }
     // putting: how much it breaks
-    const putting = ready && !hole.mini && greenLie(terrainAt(ball)) && CLUBS[clubIdx].putter;
+    const putting = ready && greenLie(terrainAt(ball)) && CLUBS[clubIdx].putter;
     $('readerBox').style.display = putting ? '' : 'none';
-    if (!putting || readerKey === gk) { updateAimCheck(); return; }
+    if (!putting || readerKey === gk) return;
     readerKey = gk;
-    // the read: exactly where to aim (left / right of the cup), how hard (plays like, in feet), the slope and the green speed
-    const r = readPutt(), off = r.aimYd, rise = r.rise;
-    $('readerBreak').textContent = Math.abs(off) * 36 < 1.5 ? 'Aim at the cup' : `Aim ${inchFt(off)} ${off > 0 ? 'right ▶' : '◀ left'}`;
-    $('readerSlope').innerHTML = `Plays like <b>${Math.round(r.playsFt)} ft</b> · ` + (Math.abs(rise) < 0.5 ? 'Flat' : `${rise > 0 ? '▲ Uphill' : '▼ Downhill'} ${Math.abs(rise).toFixed(0)} in`)
-      + (hole.mini ? '' : `<br>Stimp ${hole.stimp} (${stimpName(hole.stimp)})`);
-    updateAimCheck();
-  }
-  // your aim vs the solved line, measured at the cup (updates as you nudge the aim)
-  function updateAimCheck() {
-    const el = $('readerAim'); if (!el) return;
-    const show = $('readerBox').style.display !== 'none' && puttRead && (state === 'ready' || state === 'swinging');
-    if (!show) { el.textContent = ''; return; }
-    const err = Math.atan2(Math.sin(aimAng - puttRead.ang), Math.cos(aimAng - puttRead.ang)) * puttRead.d;
-    const txt = Math.abs(err) * 36 < 1.5 ? 'Your aim: ✔ on the line' : `Your aim: ${inchFt(err)} too far ${err > 0 ? 'right' : 'left'}`;
-    if (el.textContent !== txt) el.textContent = txt;
-    el.classList.toggle('ok', Math.abs(err) * 36 < 1.5);
+    const pin = hole.pin, d = distToPin(), angPin = Math.atan2(pin.y - ball.y, pin.x - ball.x);
+    const path = simPutt(angPin, puttSpeed(d + 0.3, angPin));
+    const u = { x: Math.cos(angPin), y: Math.sin(angPin) }, ur = { x: -u.y, y: u.x };
+    let lat = 0;
+    for (const q of path) { const al = (q.x - ball.x) * u.x + (q.y - ball.y) * u.y; lat = (q.x - ball.x) * ur.x + (q.y - ball.y) * ur.y; if (al >= d) break; }
+    const ft = Math.abs(lat) * 3, rise = (terrainH(hole, pin.x, pin.y) - terrainH(hole, ball.x, ball.y)) * 36;
+    // a caddie's read, not a laser: break in rounded cups, the slope in inches and how fast the green is
+    const cups = Math.round(ft / 0.35), side = lat > 0 ? '▶' : '◀';
+    $('readerBreak').textContent = cups < 1 ? (ft < 0.08 ? 'Straight' : 'Inside the cup') : cups > 8 ? `Big break ${side}` : `About ${cups} cup${cups > 1 ? 's' : ''} ${side}`;
+    $('readerSlope').textContent = (Math.abs(rise) < 0.5 ? 'Flat' : `${rise > 0 ? '▲ Uphill' : '▼ Downhill'} ${Math.abs(rise).toFixed(0)} in`)
+      + (hole.mini ? '' : ` · Stimp ${hole.stimp} (${stimpName(hole.stimp)})`);
   }
   $('sideToggle').addEventListener('click', () => { ensureAudio(); sfx.click(); save.ui.side = !save.ui.side; greenKey = mapKey = readerKey = ''; persist(); });
   // the floating pin marker over the flag (pinned to the screen edge when the flag is off-screen)
@@ -6312,11 +6247,11 @@
         <p><b>Release left of gold → hook.</b> The ball starts left and bends hard left. Hooks curve about 50% more than slices, so the far-left red zone sends it <b>way</b> left. Hooks run out more after landing.</p>
         <p><b>Shape it on purpose:</b> while you pull back, slide your finger right for a <b>fade</b> (curves right) or left for a <b>draw</b> (curves left). The dotted line bends to show it. Putts don't curve.</p>
         <p><b>The needle gets faster</b> the harder you pull and the longer the club. Drivers are the hardest to time, wedges and putters the easiest. Every miss also loses a little distance.</p>
-        <p><b>Putting:</b> pull back to set your <b>stroke</b>: the tag shows how many feet that stroke rolls on a flat, normal-speed (Stimp 10) green, and putts roll the distance you set. The PIN box shows how many <b>feet</b> you have.</p>
+        <p><b>Putting is by feel.</b> There's no exact distance line on the green, just a short start line like the line on your ball. Pull back to set your <b>stroke %</b>: it tells you roughly how far that stroke rolls on a flat, normal-speed (Stimp 10) green. The PIN box shows how many <b>feet</b> you have.</p>
         <p><b>Aim putts exactly</b> with the <b>◀ AIM ▶</b> buttons in the bottom-left corner (hold to keep turning), or the <b>left / right arrow keys</b> on a keyboard (hold Shift for bigger steps). Up / down arrows change club.</p>
-        <p><b>Reading the green:</b> the Green Reader tells you where to aim (how far left or right of the cup), how hard to hit it (<b>Plays like</b> = the stroke in feet), the slope uphill or downhill, and the green speed. The gold dotted line on the green map shows the ball's path.</p>
+        <p><b>Read it yourself:</b> every course has its own green speed (Stimp 9 is slow, 13 is lightning, and it changes a little each day). Fast greens and downhill putts roll further; uphill and slow greens need more. The Green Reader gives the slope, uphill/downhill in inches and roughly how many cups it breaks.</p>
         <p><b>Wind</b> never moves a putt, and it barely touches little chips.</p>
-        <p><b>Long putts</b> still wander a little, and a ball rolling too fast lips out. The needle still pushes or pulls the putt off line.</p>
+        <p><b>Long putts are hard:</b> the further the putt, the more your pace and line wander, real greens have little bumps, and a ball rolling too fast lips out. Get it close, don't blast it. The needle still pushes or pulls the putt off line.</p>
       </div>
       <div class="sect">HOW CLUBS DIFFER</div>
       <div class="howcard">
@@ -6325,7 +6260,7 @@
         <p><b>Control</b> how slowly the needle moves. A slower needle is easier to time.</p>
         <p><b>Straight</b> how much a mistimed shot curves. Power clubs like the Titan Driver miss big; the Laser Driver misses small.</p>
         <p><b>Spin</b> high-loft and spin clubs land soft and stop; low clubs run out after landing.</p>
-        <p><b>Upgrades:</b> every club has three stats to upgrade, up to level 5 each: <b>Power</b> (+4% distance), <b>Accuracy</b> (+1.6% gold zone and misses and putts 8% straighter) and <b>Control</b> (needle 12% slower). A stat can only go one level past the club's lowest stat, so you upgrade a bit of everything at a time.</p>
+        <p><b>Upgrades:</b> every club has three stats to upgrade, up to level 5 each: <b>Power</b> (+4% distance), <b>Accuracy</b> (+1.6% gold zone and misses 8% straighter) and <b>Control</b> (needle 12% slower). A stat can only go one level past the club's lowest stat, so you upgrade a bit of everything at a time.</p>
         <p><b>Club colours</b> are in the Clubs tab too: buy a colour once and paint any club with it.</p>
         <table class="cg"><tr><th>SLOT</th><th>MODELS (STOCK YDS)</th></tr>${guide}</table>
       </div>
@@ -6343,7 +6278,7 @@
         <p><b>Badges:</b> earn badges (Hole in One, Daily Champion and more) and equip one in the Golfer tab. It shows next to your name on the leaderboards.</p>
         <p><b>Play fair:</b> edited saves, money the game never paid out and impossible scores get caught, and cheaters are banned.</p>
         <p><b>Hole payouts:</b> hole-in-one $1,500 · albatross $1,000 · eagle $250 · birdie $100 · par $25 · bogey or worse $0, plus a round bonus.</p>
-        <p><b>🔥 Momentum:</b> 3 holes in a row with no bogey (par or better) adds <b>+3%</b> to your hole payouts, and every hole you keep it going adds another +3% (up to +30%). A bogey ends it.</p>
+        <p><b>🔥 Momentum:</b> 3 holes in a row with no bogey (par or better) adds <b>+20%</b> to your hole payouts, and every hole you keep it going adds another +20%, with no limit. A bogey ends it.</p>
         <p><b>Play Friends:</b> add friends with their friend code, then play a 1v1 for a wager (3, 6 or 9 holes, sudden-death playoff if tied), 2v2 (scramble, alt shot or best ball) or a Foursome (own ball 1v1v1v1 for up to 4 golfers, or a 2 v 2 scramble; the host sets one buy-in everyone pays). Winners split the pot.</p>
         <p><b>Money</b> buys gear: spend it in <b>Clubs</b> on new models and upgrades. Customize your outfit and golf bag in <b>Golfer</b>.</p>
       </div>`;
@@ -6427,7 +6362,7 @@
     if (clubSel < 8) {
       const si = clubSel, eq = CLUBS[si], u = upOf(eq), lv = lvOf(eq), ts = tracksOf(eq), total = ts.length * MAX_LV;
       const what = { p: () => `+${Math.round(eq.carry * PWR_STEP)} yds (${Math.round(eq.carry * (distMult(eq) + PWR_STEP))} total)`,
-        a: () => eq.putter ? 'Gold zone +1.6% · putts roll 8% truer' : 'Gold zone +1.6% · misses 8% straighter', c: () => 'Needle 12% slower' };
+        a: () => eq.putter ? 'Gold zone +1.6%' : 'Gold zone +1.6% · misses 8% straighter', c: () => 'Needle 12% slower' };
       const rows = ts.map(([k, name]) => {
         const cur = u[k], cost = cur < MAX_LV ? upCost(eq, k, cur) : 0, open = canUpTrack(eq, k);
         const btn = cur >= MAX_LV ? '<button class="main sm" disabled>MAXED</button>'
@@ -7098,13 +7033,11 @@
   // ---- Pop-ups: the first-time welcome, "What's new" after an update, and one-time tips ----
   // What's new only lists things players can see in the game (nothing about anti-cheat, analytics or creator tools).
   // To announce a new update: change NEWS_VER and replace NEWS.
-  const NEWS_VER = '2026.10.20';
+  const NEWS_VER = '2026.10.20b';
   const NEWS = [
     ['🎯', '<b>Aim your putts exactly.</b> Use the <b>◀ AIM ▶</b> buttons in the bottom-left corner (hold to keep turning) or the <b>left / right arrow keys</b>. Up / down arrows change club.'],
-    ['🟢', '<b>Greens are easier to read.</b> The Green Reader now tells you exactly where to aim (how far left or right of the cup), how hard to hit it (<b>Plays like</b> in feet), and shows the ball\'s path as a gold line. <b>Your aim</b> turns green when you\'re on the line.'],
-    ['📏', '<b>Putts roll truer.</b> The distance you pull back is the distance you get, and the stroke tag shows the exact feet next to what the putt needs.'],
     ['🌬️', '<b>No more wind on putts,</b> and it barely touches little chips.'],
-    ['🔥', '<b>Momentum!</b> Go 3 holes in a row without a bogey and your hole payouts get <b>+3%</b>, then +3% more for every hole you keep it going (up to +30%).'],
+    ['🔥', '<b>Momentum!</b> Go 3 holes in a row without a bogey and your hole payouts get <b>+20%</b>, then +20% more for every hole you keep it going, with no limit.'],
     ['🏌️', '<b>Club upgrades are worth it now:</b> more yards from Power, a bigger gold zone and straighter misses from Accuracy, a slower needle from Control, and every upgrade costs less.'],
     ['⛳', '<b>Chami Links Black is a full 18 holes</b> (all of Bethpage Black from the tips) and <b>Chami Links Gold</b> is now the front nine. Both start with fresh leaderboards.'],
     ['📋', '<b>Cleaner scorecards</b> between holes and at the end of every round.'],
