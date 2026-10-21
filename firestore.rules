@@ -19,6 +19,8 @@ service cloud.firestore {
         || (d.badge == 'firstace' && get(/databases/$(database)/documents/meta/firstAce).data.uid == uid);
     }
     // a score's time has to be close to now (no posting to other days by changing the device clock)
+    // Daily Champion win count shown next to the trophy (optional)
+    function okWins(d) { return !('wins' in d) || (d.wins is int && d.wins >= 0 && d.wins < 1000); }
     function recent(ms) { return ms is int && ms > request.time.toMillis() - 172800000 && ms < request.time.toMillis() + 172800000; }
 
     // Each golfer's saved progress (only they can read or write it; the creator can read it).
@@ -36,8 +38,8 @@ service cloud.firestore {
     // Course leaderboards: one row per golfer (their best), all-time and per day.
     function okScore(uid) {
       let d = request.resource.data;
-      return isMe(uid) && notBanned() && d.keys().hasOnly(['name', 'uid', 'rel', 'strokes', 'date', 'day', 't', 'badge'])
-        && d.uid == uid && okName(d.name) && okBadge(d, uid)
+      return isMe(uid) && notBanned() && d.keys().hasOnly(['name', 'uid', 'rel', 'strokes', 'date', 'day', 't', 'badge', 'wins'])
+        && d.uid == uid && okName(d.name) && okBadge(d, uid) && okWins(d)
         && d.rel is int && d.rel > -30 && d.rel < 300
         && d.strokes is int && d.strokes > 0 && d.strokes < 400
         && recent(d.date) && d.day is string && d.t == request.time;
@@ -58,8 +60,8 @@ service cloud.firestore {
     // Daily Closest to the Pin: one row per golfer per day (their closest shot, in yards).
     function okShot(uid, day) {
       let d = request.resource.data;
-      return isMe(uid) && notBanned() && d.keys().hasOnly(['name', 'uid', 'yd', 'date', 'day', 't', 'badge'])
-        && d.uid == uid && okName(d.name) && okBadge(d, uid)
+      return isMe(uid) && notBanned() && d.keys().hasOnly(['name', 'uid', 'yd', 'date', 'day', 't', 'badge', 'wins'])
+        && d.uid == uid && okName(d.name) && okBadge(d, uid) && okWins(d)
         && d.yd is number && d.yd >= 0 && d.yd < 400
         && recent(d.date) && d.day == day && d.t == request.time;
     }
@@ -73,8 +75,8 @@ service cloud.firestore {
     // Hole-in-ones today (the banner on the Play tab): ONE record per day holding a list, so the banner costs 1 read.
     // Each write can only add one ace to the end of the list, and only an ace by the golfer writing it.
     function okAce(a) {
-      return a is map && a.keys().hasOnly(['name', 'uid', 'cid', 'course', 'hole', 'yds', 'date', 'badge'])
-        && a.uid == request.auth.uid && okName(a.name) && okBadge(a, request.auth.uid)
+      return a is map && a.keys().hasOnly(['name', 'uid', 'cid', 'course', 'hole', 'yds', 'date', 'badge', 'wins'])
+        && a.uid == request.auth.uid && okName(a.name) && okBadge(a, request.auth.uid) && okWins(a)
         && a.course is string && a.course.size() < 40 && a.hole is int && a.yds is int && recent(a.date);
     }
     match /acesToday/{day} {
@@ -123,9 +125,24 @@ service cloud.firestore {
 
     // ---- Anti-cheat ----
     // Bans: the game bans itself when it catches cheating (auto); only the creator can ban anyone else or lift a ban.
+    // appeal == false marks a final ban (the game's code was tampered with). A golfer's own game can only make its auto-ban
+    // harsher (turn appeals off), never softer.
     match /bans/{uid} {
       allow read: if isMe(uid) || isAdmin();
       allow create: if isAdmin() || (isMe(uid) && request.resource.data.auto == true);
+      allow update: if isAdmin() || (isMe(uid) && resource.data.auto == true && request.resource.data.appeal == false
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['appeal', 'reason', 't']));
+      allow delete: if isAdmin();
+    }
+    // Appeals: one per banned golfer, only for bans that allow it. The creator reads them and unbans or turns them down.
+    match /appeals/{uid} {
+      allow read: if isMe(uid) || isAdmin();
+      allow create: if isMe(uid) && exists(/databases/$(database)/documents/bans/$(uid))
+        && get(/databases/$(database)/documents/bans/$(uid)).data.get('appeal', true) != false
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'reason', 'msg', 'at', 't', 'status'])
+        && request.resource.data.uid == uid && request.resource.data.status == 'pending'
+        && request.resource.data.msg is string && request.resource.data.msg.size() <= 300
+        && request.resource.data.reason is string && request.resource.data.reason.size() <= 140 && request.resource.data.name is string && request.resource.data.name.size() <= 20;
       allow update, delete: if isAdmin();
     }
     // Banned golfers' IDs (written by the creator's tools), so every game hides them from all the leaderboards.
@@ -137,8 +154,9 @@ service cloud.firestore {
     match /flags/{id} {
       allow read, delete: if isAdmin();
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
-        && request.resource.data.keys().hasOnly(['uid', 'name', 'kind', 'detail', 'strong', 'google', 'at', 't'])
-        && request.resource.data.detail is string && request.resource.data.detail.size() <= 140;
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'kind', 'detail', 'strong', 'google', 'at', 't', 'card', 'hard'])
+        && request.resource.data.detail is string && request.resource.data.detail.size() <= 140
+        && (!('card' in request.resource.data) || (request.resource.data.card is map && request.resource.data.card.size() <= 4));
     }
 
     // (Analytics moved to Google Analytics: the old "presence" notes and "daily" counters aren't used any more.)
@@ -157,6 +175,8 @@ service cloud.firestore {
     }
 
     // ---- Play Friends ----
+    // (Oct 20 2026: friends were taken out; matches are joined with the match code. Codes are only read by the creator's
+    //  one-time player list catch-up now, and the inbox is closed.)
     // Friend codes: anyone signed in can look one up; only its owner can claim or rename it.
     match /codes/{code} {
       allow read: if request.auth != null;
@@ -170,7 +190,6 @@ service cloud.firestore {
     // Inbox: friend requests and match invites. Anyone signed in can drop one in; only the owner reads or clears it.
     match /inbox/{uid}/items/{id} {
       allow read, delete: if isMe(uid);
-      allow create: if request.auth != null && request.resource.data.from == request.auth.uid && okName(request.resource.data.name);
     }
     // Matches (doc id = the 6-character match code). Golfers in the match can update it; the host can't be changed.
     match /matches/{id} {
