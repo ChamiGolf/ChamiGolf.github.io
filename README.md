@@ -77,6 +77,7 @@ Everything below runs inside the game on each player's device, plus the Firebase
 ## Updates and pop-ups
 
 - To announce an update to players, edit `NEWS_VER` and the `NEWS` list in index.html. Each golfer sees it once. Only list things players can see (nothing about anti-cheat or creator tools).
+- **Every release:** bump `GAME_VER` in index.html and `"game"` in `version.json` to the same value (and `"news"` / `"num"` to match `NEWS_VER` / `NEWS_NUM` when there's a What's New). Games that are already open check `version.json` every 5 minutes and when the player comes back to the game, then show an "🔄 Update ready · Reload now" pop-up on the home screen (never mid-round). Add each update to the `UPDATES` list too (the "📜 Previous updates" page).
 - New players get a welcome pointing them to the 3C Par Three, plus one-time tips the first time they open Clubs and Golfer.
 
 ## Firebase free plan

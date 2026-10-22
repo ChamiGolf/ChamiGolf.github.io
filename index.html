@@ -980,6 +980,16 @@
   </div>
 </div>
 
+<!-- ===== A newer version is out (reload to get it) ===== -->
+<div id="updReady" class="overlay hidden" style="z-index:33">
+  <div class="card news">
+    <h2>🔄 Update ready</h2>
+    <div class="sub" id="updReadyNum" style="color:var(--gold-l);font-weight:800"></div>
+    <div class="sub" style="font-size:15px;line-height:1.5">Reload the game to get the newest version. Your progress is saved.</div>
+    <div class="btns" style="margin-top:14px"><button class="main" id="updReload">Reload now</button><button class="ghost" id="updLater">Later</button></div>
+  </div>
+</div>
+
 <!-- ===== Every update so far ===== -->
 <div id="updPop" class="overlay hidden" style="z-index:32">
   <div class="card news" style="max-width:600px;width:calc(100% - 24px)">
@@ -4693,7 +4703,7 @@
     appId: '1:934222144340:web:b7f2209350da831f4e5ec1',
     measurementId: 'G-4D02FQ9XMJ'
   };
-  const GAME_VER = '2026.10.20c';
+  const GAME_VER = '2026.10.21';   // bump on EVERY release: open games compare it to the live site and pop up "Update ready"
   // The creator: gets the 👑 Creator badge and the admin tools (bans, analytics). The rules check this email too.
   const CREATOR_EMAIL = 'jamesondoyle11@gmail.com';
   // In-game money paid to the top 3 of each Daily Tournament, collected the next time they open the game.
@@ -7355,7 +7365,7 @@
   ];
   // Every update so far, newest first (shown under "Previous updates"). Only things players can see.
   const UPDATES = [
-    ['2.0', 'Oct 20, 2026', NEWS.map(n => n[1])],
+    ['2.0', 'Oct 20, 2026', NEWS.map(n => n[1]).concat(['<b>Update pop-up:</b> if a new update comes out while the game is open, you get a pop-up to reload and get it'])],
     ['1.6', 'Oct 20, 2026', ['Aim putts exactly with the ◀ AIM ▶ buttons or the arrow keys', 'No more wind on putts', '🔥 Momentum: 3 holes in a row with no bogey boosts your payouts',
       'Stronger, cheaper club upgrades (Power, Accuracy, Control)', 'Chami Links Black became a full 18 holes and Chami Links Gold the front nine', 'Cleaner scorecards']],
     ['1.5', 'Oct 15, 2026', ['What\'s New pop-ups and first-time tips', 'Teachers say hi on the first tee of 3C Par Three and Chami Links Crimson', 'Free golf ball colours with R/G/B sliders',
@@ -7370,6 +7380,32 @@
       'Sharp doglegs and unique holes', 'A realistic cup with lip-outs', 'Draw and fade shots']],
     ['1.0', 'Oct 10, 2026', ['Red & Gold Golf launches: 9 holes with a swing meter, wind, bounces and roll']],
   ];
+  // ---- "Update ready" pop-up: an open game checks the tiny version.json on the live site now and then (every 5 minutes, and
+  // whenever you come back to it). When a newer version is out it asks you to reload. It never interrupts a round: it waits
+  // for the home screen. TO RELEASE AN UPDATE: bump GAME_VER here AND "game" in version.json (plus NEWS_VER / "news" and
+  // NEWS_NUM / "num" when there's a What's New).
+  let updReady = null, updCheckAt = 0;
+  async function checkForUpdate() {
+    if (updReady || Date.now() - updCheckAt < 60000 || !navigator.onLine) return;
+    updCheckAt = Date.now();
+    try {
+      const r = await fetch('version.json?u=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return;
+      const v = await r.json(); if (!v || !v.game || (v.game === GAME_VER && (!v.news || v.news === NEWS_VER))) return;
+      updReady = { num: v.news && v.news !== NEWS_VER ? String(v.num || '') : '' };
+      showUpdateReady();
+    } catch (e) {}
+  }
+  function showUpdateReady() {
+    if (!updReady || popOpen() || inRound() || !$('liveOv').classList.contains('hidden')) return;
+    $('updReadyNum').textContent = updReady.num ? `Update ${updReady.num} is out!` : 'A new version of the game is out!';
+    $('updReady').classList.remove('hidden');
+  }
+  $('updReload').addEventListener('click', () => { ensureAudio(); sfx.click(); try { flushCloud(); persist(); } catch (e) {} setTimeout(() => location.reload(), 400); });
+  $('updLater').addEventListener('click', () => { ensureAudio(); sfx.click(); $('updReady').classList.add('hidden'); setTimeout(showUpdateReady, 600000); });
+  setInterval(() => { if (!document.hidden) checkForUpdate(); }, 300000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+  new MutationObserver(() => { if (updReady && !$('home').classList.contains('hidden') && !updReady.seen) { updReady.seen = true; setTimeout(showUpdateReady, 800); } }).observe($('home'), { attributes: true, attributeFilter: ['class'] });
+  setTimeout(checkForUpdate, 20000);
   function showUpdates() {
     $('updList').innerHTML = UPDATES.map(([v, d, items], k) => `<div class="upd${k === 0 ? ' cur' : ''}"><div class="uh"><b>Update ${v}</b><span>${d}${k === 0 ? ' · latest' : ''}</span></div>
       <ul>${items.map(t => `<li>${t}</li>`).join('')}</ul></div>`).join('');
