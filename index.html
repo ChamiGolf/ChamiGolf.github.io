@@ -4703,7 +4703,7 @@
     appId: '1:934222144340:web:b7f2209350da831f4e5ec1',
     measurementId: 'G-4D02FQ9XMJ'
   };
-  const GAME_VER = '2026.10.21';   // bump on EVERY release: open games compare it to the live site and pop up "Update ready"
+  const GAME_VER = '2026.10.22';   // bump on EVERY release: open games compare it to the live site and pop up "Update ready"
   // The creator: gets the 👑 Creator badge and the admin tools (bans, analytics). The rules check this email too.
   const CREATOR_EMAIL = 'jamesondoyle11@gmail.com';
   // In-game money paid to the top 3 of each Daily Tournament, collected the next time they open the game.
@@ -5287,6 +5287,11 @@
   const BAN_KEY = 'cg-ban';
   let banInfo = null;
   try { banInfo = JSON.parse(localStorage.getItem(BAN_KEY)); } catch (e) {}
+  // bans made by mistake by older versions of the game (Cloudflare's analytics script, the site's address with a dot on the end,
+  // a sleeping iPad's clock, a save fingerprint mix-up, good rounds on a par-3 course) come off by themselves
+  if (banInfo && /cloudflareinsights|chamigolf\.github\.io\.\)|clock running at 0\.|save was edited by hand|over 9 holes at 3C Par Three/.test(banInfo.reason || '')) {
+    banInfo = null; try { localStorage.removeItem(BAN_KEY); } catch (e) {}
+  }
   const banned = () => !!banInfo && !isCreator();
   function showBanned() {
     const o = $('bannedOv'); if (!o) return;
@@ -5398,8 +5403,8 @@
     const card = ' ' + cardTok(course.id, scores), at = ` at ${course.name}`;
     if (roundAces >= 4) cheatFlag('aces', `${roundAces} holes in one in one round${at}${card}`, true);
     else if (roundAces >= 2) cheatFlag('aces', `${roundAces} holes in one in one round${at}${card}`, false);
-    if (rel <= -Math.max(10, n)) cheatFlag('score', `${fmtRel(rel)} over ${n} holes${at}${card}`, true);
-    else if (rel <= -Math.max(4, Math.ceil(n * 0.3))) cheatFlag('score', `${fmtRel(rel)} over ${n} holes${at}${card}`, false);
+    if (rel <= -Math.max(16, Math.ceil(n * 1.6))) cheatFlag('score', `${fmtRel(rel)} over ${n} holes${at}${card}`, true);
+    else if (rel <= -Math.max(8, Math.ceil(n * 0.9))) cheatFlag('score', `${fmtRel(rel)} over ${n} holes${at}${card}`, false);
     if (rStat.eagles >= 3) cheatFlag('score', `${rStat.eagles} eagles in one round${at}${card}`, false);
     if (rStat.chips >= 3) cheatFlag('score', `${rStat.chips} chip-ins in one round${at}${card}`, false);
     if (rStat.shots >= 20 && rStat.perf / rStat.shots >= 0.9) cheatFlag('swings', `${rStat.perf} of ${rStat.shots} swings PERFECT in one round${at}`, false);
@@ -5417,16 +5422,16 @@
     if (last[0].t > 0 && last.every(x => Math.abs(x.t - last[0].t) <= 2)) cheatFlag('interference', `6 swings in a row held for exactly ${last[0].t} ms (auto-clicker?)`, false);
   }
   // ---- Outside interference: bots, auto-clickers, injected scripts, rigged browser functions and speed hacks.
-  //   Messing with the game's code (injected scripts, swapped-out browser functions, a modified copy) = HARD ban, no appeal.
+  //   Messing with the game's code (injected scripts, swapped-out browser functions, a modified copy on another site) = HARD ban, no appeal.
   //   Bots, auto-clickers, speed hacks and extension scripts = ban right away, but it can be appealed.
-  //   Smaller signs (a few scripted taps, macro-like swings, two tabs, the debugger pausing the game) are flagged for review.
+  //   Smaller signs (a few scripted taps, macro-like swings, outside scripts) are flagged for review.
   (function watchInterference() {
     const flag = what => cheatFlag('interference', what, false);
     const ban = what => cheatFlag('interference', what, true);
     const hard = what => cheatFlag('tamper', what, 'hard');
     // a copy of the game running anywhere but chamigolf.github.io has had its code changed (local testing on localhost is only flagged)
     try {
-      const hn = location.hostname;
+      const hn = location.hostname.toLowerCase().replace(/\.$/, '');   // "chamigolf.github.io." (trailing dot) is the same site
       if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(hn)) flag(`game running from a local copy (${hn})`);
       else if (hn !== 'chamigolf.github.io') hard(`a modified copy of the game was running (${(location.protocol === 'file:' ? 'a file on the device' : hn).slice(0, 60)})`);
     } catch (e) {}
@@ -5447,21 +5452,17 @@
       if (Function.prototype.toString !== fnStr) hard('Function.toString was replaced (hiding injected code)');
     };
     checkNatives();
-    // speed hacks: the game's clock and the real clock drifting apart. Also: the game frozen for a long time while it's
-    // on screen (the browser's debugger stopped it, which is how variables get changed mid-round)
-    let w0 = Date.now(), p0 = performance.now(), odd = 0, frozen = 0;
+    // speed hacks: the game's clock running faster than the real clock (a slow clock is just a sleeping or battery-saving device)
+    let w0 = Date.now(), p0 = performance.now(), odd = 0;
     setInterval(() => {
       const w = Date.now(), p = performance.now(), dw = w - w0, dp = p - p0; w0 = w; p0 = p;
-      if (dw > 2000 && dp > 2000) { const r = dp / dw; if (r > 1.25 || r < 0.8) { if (++odd >= 3) ban(`game clock running at ${r.toFixed(2)}x real time (speed hack)`); } else odd = 0; }
+      if (document.hidden) odd = 0;
+      else if (dw > 2000 && dp > 2000 && dw < 20000) { const r = dp / dw; if (r > 1.5) { if (++odd >= 4) ban(`game clock running at ${r.toFixed(2)}x real time (speed hack)`); } else odd = 0; }
       checkNatives();
     }, 5000);
-    { let last = performance.now();
-      setInterval(() => {
-        const now = performance.now(), gap = now - last; last = now;
-        if (gap > 8000 && !document.hidden && document.hasFocus() && inRound() && ++frozen === 2) flag(`the game froze for ${Math.round(gap / 1000)}s twice while on screen mid-round (debugger?)`);
-      }, 1000); }
+    // (the game pausing on screen is no longer flagged: iPads pause it for split screen, notifications and Control Center)
     // scripts or frames added to the page that the game itself didn't add (cheat extensions, console snippets)
-    const okHost = /(^|\.)(googletagmanager\.com|google-analytics\.com|gstatic\.com|google\.com|googleapis\.com|firebaseapp\.com|firebaseio\.com|cloudflare\.com)$/i;
+    const okHost = /(^|\.)(googletagmanager\.com|google-analytics\.com|gstatic\.com|google\.com|googleapis\.com|firebaseapp\.com|firebaseio\.com|cloudflare\.com|cloudflareinsights\.com)$/i;
     try {
       new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(nd => {
         const tag = nd && nd.tagName; if (tag !== 'SCRIPT' && tag !== 'IFRAME') return;
@@ -5470,15 +5471,15 @@
         let u = null; try { u = new URL(src, location.href); } catch (e) { return; }
         if (/^(chrome|moz|safari-web)-extension:$/.test(u.protocol)) { if (tag === 'SCRIPT') ban(`a browser extension added a script to the game (${u.hostname.slice(0, 40)})`); else flag(`browser extension added a frame (${u.hostname.slice(0, 40)})`); }
         else if (u.protocol === 'javascript:' || u.protocol === 'data:' || u.protocol === 'blob:') hard(`a ${u.protocol.replace(':', '')} ${tag === 'SCRIPT' ? 'script' : 'frame'} was injected into the page`);
-        else if (u.hostname && u.hostname !== location.hostname && !okHost.test(u.hostname)) { if (tag === 'SCRIPT') hard(`outside script added: ${u.hostname.slice(0, 60)}`); else flag(`outside frame added: ${u.hostname.slice(0, 60)}`); }
+        else if (u.hostname && u.hostname !== location.hostname && !okHost.test(u.hostname)) flag(`outside ${tag === 'SCRIPT' ? 'script' : 'frame'} added: ${u.hostname.slice(0, 60)}`);   // networks, browsers and blockers add these too: review only, never a ban
       }))).observe(document.documentElement, { childList: true, subtree: true });
     } catch (e) {}
     // the game open in two tabs at once (rounds farmed side by side)
-    try { const bc = new BroadcastChannel('cg-tabs'); bc.onmessage = e => { if (e.data === 'hi') bc.postMessage('here'); else if (e.data === 'here') flag('the game is open in two tabs at once'); }; bc.postMessage('hi'); } catch (e) {}
+    // (no longer flagged: reloading for an update or reopening the game does this all the time)
     // the save edited by hand from another tab (devtools)
     addEventListener('storage', e => {
       if (e.key !== SAVE_KEY || !e.newValue) return;
-      try { const o = JSON.parse(e.newValue); if (o && o.sig && o.sig !== sigOf(o)) cheatFlag('save', 'the game save was edited in another tab', true); } catch (er) {}
+      try { const o = JSON.parse(e.newValue); if (o && o.sig && o.sig !== sigOf(o)) cheatFlag('save', 'the game save was changed in another tab', false); } catch (er) {}
     });
   })();
   function aceCheck(h) {
@@ -5506,7 +5507,7 @@
   }
   function startupChecks() {
     if (isCreator()) { syncBan(); return; }
-    if (tamperedSave) cheatFlag('save', 'the game save was edited by hand', true);
+    if (tamperedSave) cheatFlag('save', 'the game save didn\'t match its fingerprint (edited by hand?)', false);
     econCheck();
     showBanned();
   }
